@@ -37,7 +37,6 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
             String userId = inputForm.getUser_id();
             String causeId = inputForm.getCause_id();
             if(!userIsFollowingCause(userId, causeId)) {
-                String causeDesc = inputForm.getCause_desc();
                 String now = Instant.now().toString();
                 inputForm.setTimestamp(now);
                 addUserCause(inputForm);

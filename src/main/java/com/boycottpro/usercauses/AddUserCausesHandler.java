@@ -6,7 +6,10 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
 
 import com.boycottpro.models.Causes;
+import com.boycottpro.models.ResponseMessage;
 import com.boycottpro.models.UserCauses;
+import com.boycottpro.usercauses.model.AddCausesForm;
+import com.boycottpro.usercauses.model.Reason;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -33,33 +36,43 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         try {
-            UserCauses inputForm = objectMapper.readValue(event.getBody(), UserCauses.class);
+            AddCausesForm inputForm = objectMapper.readValue(event.getBody(), AddCausesForm.class);
             String userId = inputForm.getUser_id();
-            String causeId = inputForm.getCause_id();
-            if(!userIsFollowingCause(userId, causeId)) {
-                String now = Instant.now().toString();
-                inputForm.setTimestamp(now);
-                addUserCause(inputForm);
+            for(Reason reasons : inputForm.getCauses()) {
+                if(!userIsFollowingCause(userId, reasons.getCause_id())) {
+                    addUserCause(userId,reasons.getCause_id(), reasons.getCause_desc());
+                }
             }
-            String responseBody = objectMapper.writeValueAsString(inputForm);
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(200)
-                    .withHeaders(Map.of("Content-Type", "application/json"))
-                    .withBody(responseBody);
+            return response(200, "All causes added successfully.");
         } catch (Exception e) {
-            return new APIGatewayProxyResponseEvent()
-                    .withStatusCode(500)
-                    .withBody("{\"error\": \"Unexpected server error: " + e.getMessage() + "\"}");
+            e.printStackTrace();
+            return response(500, "Transaction failed: " + e.getMessage());
         }
     }
 
-    private boolean addUserCause(UserCauses inputForm) {
+    private APIGatewayProxyResponseEvent response(int status, String body)  {
+        ResponseMessage message = new ResponseMessage(status,body,
+                body);
+        String responseBody = null;
+        try {
+            responseBody = objectMapper.writeValueAsString(message);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        return new APIGatewayProxyResponseEvent()
+                .withStatusCode(status)
+                .withHeaders(Map.of("Content-Type", "application/json"))
+                .withBody(responseBody);
+    }
+
+    private boolean addUserCause(String userId, String causeId, String CauseDesc) {
+        String now = Instant.now().toString();
         // Build the item map
         Map<String, AttributeValue> item = Map.ofEntries(
-                Map.entry("user_id", AttributeValue.fromS(inputForm.getUser_id())),
-                Map.entry("cause_id", AttributeValue.fromS(inputForm.getCause_id())),
-                Map.entry("cause_desc", AttributeValue.fromS(inputForm.getCause_desc())),
-                Map.entry("timestamp", AttributeValue.fromS(inputForm.getTimestamp()))
+                Map.entry("user_id", AttributeValue.fromS(userId)),
+                Map.entry("cause_id", AttributeValue.fromS(causeId)),
+                Map.entry("cause_desc", AttributeValue.fromS(CauseDesc)),
+                Map.entry("timestamp", AttributeValue.fromS(now))
         );
 
         // Construct the PutItemRequest

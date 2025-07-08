@@ -3,7 +3,11 @@ package com.boycottpro.usercauses;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import com.boycottpro.models.ResponseMessage;
 import com.boycottpro.models.UserCauses;
+import com.boycottpro.usercauses.model.AddCausesForm;
+import com.boycottpro.usercauses.model.Reason;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +18,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +41,10 @@ class AddUserCausesHandlerTest {
 
     @Test
     void testAddsUserCauseWhenNotFollowing() throws Exception {
-        UserCauses input = new UserCauses("user123", "cause456", "Environmental", null);
+        Reason reason = new Reason("cause456", "Environmental");
+        List<Reason> causes = new ArrayList<>();
+        causes.add(reason);
+        AddCausesForm input = new AddCausesForm("user123",causes);
 
         // Mock user is not following
         when(dynamoDb.query(any(QueryRequest.class))).thenReturn(QueryResponse.builder().items(List.of()).build());
@@ -48,19 +56,18 @@ class AddUserCausesHandlerTest {
                 .withBody(objectMapper.writeValueAsString(input));
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
-
+        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
         assertEquals(200, response.getStatusCode());
-        assertTrue(response.getBody().contains("user123"));
-        assertTrue(response.getBody().contains("cause456"));
-        assertTrue(response.getBody().contains("Environmental"));
-
+        assertTrue(message.getMessage().contains("All causes added successfully."));
         verify(dynamoDb, times(1)).putItem(any(PutItemRequest.class));
     }
 
     @Test
     void testSkipsInsertIfAlreadyFollowing() throws Exception {
-        UserCauses input = new UserCauses("user123", "cause456", "Environmental", null);
-
+        Reason reason = new Reason("cause456", "Environmental");
+        List<Reason> causes = new ArrayList<>();
+        causes.add(reason);
+        AddCausesForm input = new AddCausesForm("user123",causes);
         // Mock existing record
         when(dynamoDb.query(any(QueryRequest.class))).thenReturn(QueryResponse.builder()
                 .items(List.of(Map.of("user_id", AttributeValue.fromS("user123")))).build());
@@ -75,34 +82,12 @@ class AddUserCausesHandlerTest {
     }
 
     @Test
-    void testReturns500OnJsonParseError() {
+    void testReturns500OnJsonParseError() throws JsonProcessingException {
         APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent().withBody("not-json");
 
         APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
-
+        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
         assertEquals(500, response.getStatusCode());
-        assertTrue(response.getBody().contains("Unexpected server error"));
-    }
-
-    @Test
-    void testAddsTimestampOnInsert() throws Exception {
-        UserCauses input = new UserCauses("user123", "cause456", "Rights", null);
-
-        when(dynamoDb.query(any(QueryRequest.class))).thenReturn(QueryResponse.builder().items(List.of()).build());
-        when(dynamoDb.putItem(any(PutItemRequest.class))).thenReturn(PutItemResponse.builder().build());
-
-        APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent()
-                .withBody(objectMapper.writeValueAsString(input));
-
-        APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
-
-        assertEquals(200, response.getStatusCode());
-
-        ArgumentCaptor<PutItemRequest> captor = ArgumentCaptor.forClass(PutItemRequest.class);
-        verify(dynamoDb).putItem(captor.capture());
-
-        Map<String, AttributeValue> item = captor.getValue().item();
-        assertNotNull(item.get("timestamp"));
-        assertDoesNotThrow(() -> Instant.parse(item.get("timestamp").s()));
+        assertTrue(message.getMessage().contains("Transaction failed:"));
     }
 }

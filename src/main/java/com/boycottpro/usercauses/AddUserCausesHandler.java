@@ -41,6 +41,7 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
             for(Reason reasons : inputForm.getCauses()) {
                 if(!userIsFollowingCause(userId, reasons.getCause_id())) {
                     addUserCause(userId,reasons.getCause_id(), reasons.getCause_desc());
+                    incrementCauseRecord(reasons.getCause_id());
                 }
             }
             return response(200, "All causes added successfully.");
@@ -99,5 +100,19 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
 
         return !dynamoDb.query(request).items().isEmpty();
     }
-
+    private boolean incrementCauseRecord(String causeId) {
+        try {
+            System.out.println("going to increment companies record");
+            dynamoDb.updateItem(UpdateItemRequest.builder()
+                    .tableName("causes")
+                    .key(Map.of("cause_id", AttributeValue.fromS(causeId)))
+                    .updateExpression("SET follower_count = follower_count + :inc")
+                    .expressionAttributeValues(Map.of(
+                            ":inc", AttributeValue.fromN("1")
+                    )).build());
+            return true;
+        } catch(Exception e) {
+            return false;
+        }
+    }
 }

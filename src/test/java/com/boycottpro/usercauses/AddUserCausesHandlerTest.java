@@ -51,7 +51,7 @@ class AddUserCausesHandlerTest {
 
         // Mock successful put
         when(dynamoDb.putItem(any(PutItemRequest.class))).thenReturn(PutItemResponse.builder().build());
-
+        when(dynamoDb.updateItem(any(UpdateItemRequest.class))).thenReturn(UpdateItemResponse.builder().build());
         APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent()
                 .withBody(objectMapper.writeValueAsString(input));
 

@@ -19,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,10 +53,18 @@ class AddUserCausesHandlerTest {
         // Mock successful put
         when(dynamoDb.putItem(any(PutItemRequest.class))).thenReturn(PutItemResponse.builder().build());
         when(dynamoDb.updateItem(any(UpdateItemRequest.class))).thenReturn(UpdateItemResponse.builder().build());
-        APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent()
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
                 .withBody(objectMapper.writeValueAsString(input));
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
-        APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
         ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
         assertEquals(200, response.getStatusCode());
         assertTrue(message.getMessage().contains("All causes added successfully."));
@@ -72,10 +81,18 @@ class AddUserCausesHandlerTest {
         when(dynamoDb.query(any(QueryRequest.class))).thenReturn(QueryResponse.builder()
                 .items(List.of(Map.of("user_id", AttributeValue.fromS("user123")))).build());
 
-        APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent()
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
                 .withBody(objectMapper.writeValueAsString(input));
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
-        APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
 
         assertEquals(200, response.getStatusCode());
         verify(dynamoDb, never()).putItem((PutItemRequest) any());
@@ -83,9 +100,18 @@ class AddUserCausesHandlerTest {
 
     @Test
     void testReturns500OnJsonParseError() throws JsonProcessingException {
-        APIGatewayProxyRequestEvent request = new APIGatewayProxyRequestEvent().withBody("not-json");
+        APIGatewayProxyRequestEvent event = new APIGatewayProxyRequestEvent()
+                .withBody("not-json");
+        Map<String, String> claims = Map.of("sub", "11111111-2222-3333-4444-555555555555");
+        Map<String, Object> authorizer = new HashMap<>();
+        authorizer.put("claims", claims);
 
-        APIGatewayProxyResponseEvent response = handler.handleRequest(request, context);
+        APIGatewayProxyRequestEvent.ProxyRequestContext rc = new APIGatewayProxyRequestEvent.ProxyRequestContext();
+        rc.setAuthorizer(authorizer);
+        event.setRequestContext(rc);
+
+
+        APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
         ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
         assertEquals(500, response.getStatusCode());
         assertTrue(message.getMessage().contains("Transaction failed:"));

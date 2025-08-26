@@ -10,6 +10,7 @@ import com.boycottpro.models.ResponseMessage;
 import com.boycottpro.models.UserCauses;
 import com.boycottpro.usercauses.model.AddCausesForm;
 import com.boycottpro.usercauses.model.Reason;
+import com.boycottpro.utilities.JwtUtility;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -36,11 +37,12 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         try {
+            String sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, "Unauthorized");
             AddCausesForm inputForm = objectMapper.readValue(event.getBody(), AddCausesForm.class);
-            String userId = inputForm.getUser_id();
             for(Reason reasons : inputForm.getCauses()) {
-                if(!userIsFollowingCause(userId, reasons.getCause_id())) {
-                    addUserCause(userId,reasons.getCause_id(), reasons.getCause_desc());
+                if(!userIsFollowingCause(sub, reasons.getCause_id())) {
+                    addUserCause(sub,reasons.getCause_id(), reasons.getCause_desc());
                     incrementCauseRecord(reasons.getCause_id());
                 }
             }

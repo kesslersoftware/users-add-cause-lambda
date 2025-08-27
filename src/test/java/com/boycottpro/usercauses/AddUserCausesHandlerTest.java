@@ -110,10 +110,8 @@ class AddUserCausesHandlerTest {
         rc.setAuthorizer(authorizer);
         event.setRequestContext(rc);
 
-
         APIGatewayProxyResponseEvent response = handler.handleRequest(event, context);
-        ResponseMessage message = objectMapper.readValue(response.getBody(), ResponseMessage.class);
         assertEquals(500, response.getStatusCode());
-        assertTrue(message.getMessage().contains("Transaction failed:"));
+        assertTrue(response.getBody().contains("Unexpected server error"));
     }
 }

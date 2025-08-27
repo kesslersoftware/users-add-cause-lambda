@@ -36,9 +36,10 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
 
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
+        String sub = null;
         try {
-            String sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, "Unauthorized");
+            sub = JwtUtility.getSubFromRestEvent(event);
+            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
             AddCausesForm inputForm = objectMapper.readValue(event.getBody(), AddCausesForm.class);
             for(Reason reasons : inputForm.getCauses()) {
                 if(!userIsFollowingCause(sub, reasons.getCause_id())) {
@@ -46,19 +47,18 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
                     incrementCauseRecord(reasons.getCause_id());
                 }
             }
-            return response(200, "All causes added successfully.");
+            return response(200, Map.of("message",
+                    "All causes added successfully."));
         } catch (Exception e) {
-            e.printStackTrace();
-            return response(500, "Transaction failed: " + e.getMessage());
+            System.out.println(e.getMessage() + " for user " + sub);
+            return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
 
-    private APIGatewayProxyResponseEvent response(int status, String body)  {
-        ResponseMessage message = new ResponseMessage(status,body,
-                body);
+    private APIGatewayProxyResponseEvent response(int status, Object body) {
         String responseBody = null;
         try {
-            responseBody = objectMapper.writeValueAsString(message);
+            responseBody = objectMapper.writeValueAsString(body);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

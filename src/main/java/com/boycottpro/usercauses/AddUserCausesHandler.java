@@ -11,6 +11,7 @@ import com.boycottpro.models.UserCauses;
 import com.boycottpro.usercauses.model.AddCausesForm;
 import com.boycottpro.usercauses.model.Reason;
 import com.boycottpro.utilities.JwtUtility;
+import com.boycottpro.utilities.Logger;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -37,20 +38,29 @@ public class AddUserCausesHandler implements RequestHandler<APIGatewayProxyReque
     @Override
     public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
         String sub = null;
+        int lineNum = 41;
         try {
             sub = JwtUtility.getSubFromRestEvent(event);
-            if (sub == null) return response(401, Map.of("message", "Unauthorized"));
+            if (sub == null) {
+            Logger.error(45, sub, "user is Unauthorized");
+            return response(401, Map.of("message", "Unauthorized"));
+            }
+            lineNum = 48;
             AddCausesForm inputForm = objectMapper.readValue(event.getBody(), AddCausesForm.class);
             for(Reason reasons : inputForm.getCauses()) {
+                lineNum = 51;
                 if(!userIsFollowingCause(sub, reasons.getCause_id())) {
+                    lineNum = 53;
                     addUserCause(sub,reasons.getCause_id(), reasons.getCause_desc());
+                    lineNum = 55;
                     incrementCauseRecord(reasons.getCause_id());
                 }
             }
+            lineNum = 59;
             return response(200, Map.of("message",
                     "All causes added successfully."));
         } catch (Exception e) {
-            System.out.println(e.getMessage() + " for user " + sub);
+            Logger.error(lineNum, sub, e.getMessage());
             return response(500,Map.of("error", "Unexpected server error: " + e.getMessage()) );
         }
     }
